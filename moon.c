@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <sys/socket.h>
 
 #define TIMEOUT 1  // Tiempo de espera en segundos
 #define BUFSIZE 1024
@@ -312,40 +313,8 @@ void get_ldap_banner(const char *ip, int port) {
 
 // Función para obtener el banner de TOR
 void get_tor_banner(const char *ip, int port) {
-    int sockfd;
-    struct sockaddr_in server_addr;
-    char buffer[BUFSIZE];
-
-    // Crear un socket TCP
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        perror("Error al crear el socket");
-        return;
-    }
-
-    // Configurar la dirección del servidor
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    server_addr.sin_addr.s_addr = inet_addr(ip);
-
-    // Intentar conectar al puerto
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Error al conectar");
-        close(sockfd);
-        return;
-    }
-
-    // Leer la respuesta del servidor
-    int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
-    if (len > 0) {
-        buffer[len] = '\0';
-        printf("Banner TOR recibido en puerto %d:\n%s\n", port, buffer);
-    } else {
-        printf("No se pudo obtener el banner del puerto %d\n", port);
-    }
-
-    close(sockfd);
+    // Aquí, solo imprimimos el mensaje, ya que no estamos haciendo conexión.
+    printf("TOR SOCKSv5 encontrado\n");
 }
 
 // Función para obtener el banner de Minecraft
@@ -386,6 +355,103 @@ void get_minecraft_banner(const char *ip, int port) {
     close(sockfd);
 }
 
+// Función para obtener el banner de MySQL
+void get_mysql_banner(const char *ip, int port) {
+    int sockfd;
+    struct sockaddr_in server_addr;
+    char buffer[BUFSIZE];
+
+    // Crear un socket TCP
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("Error al crear el socket");
+        return;
+    }
+
+    // Configurar la dirección del servidor
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    server_addr.sin_addr.s_addr = inet_addr(ip);
+
+    // Intentar conectar al puerto
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Error al conectar");
+        close(sockfd);
+        return;
+    }
+
+    // MySQL responde con un "saludo" que contiene información sobre la versión
+    // Enviar el paquete de saludo, siguiendo el protocolo binario de MySQL.
+
+    // Este paquete no es exactamente el handshake real, pero es una forma de establecer
+    // la comunicación inicial.
+    char handshake[] = {0x0a, 0x00, 0x00, 0x00}; // Esto es una secuencia de bytes que MySQL espera
+    send(sockfd, handshake, sizeof(handshake), 0);
+
+    // Leer la respuesta del servidor MySQL (el banner)
+    int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
+    if (len > 0) {
+        buffer[len] = '\0';  // Asegurarse de que el buffer es una cadena válida
+        printf("Banner MySQL recibido en puerto --puede no llegar nada del buffer %d:\n%s\n", port, buffer);
+    } else {
+        printf("No se pudo obtener el banner de MySQL en el puerto %d\n", port);
+    }
+
+    close(sockfd);
+}
+
+// Función para obtener el banner de PostgreSQL
+// Función para obtener el banner de PostgreSQL
+// Función para obtener el banner de PostgreSQL
+void get_postgresql_banner(const char *ip, int port) {
+    int sockfd;
+    struct sockaddr_in server_addr;
+    char buffer[BUFSIZE];
+
+    // Crear un socket TCP
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("Error al crear el socket");
+        return;
+    }
+
+    // Configurar la dirección del servidor
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    server_addr.sin_addr.s_addr = inet_addr(ip);
+
+    // Intentar conectar al puerto
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Error al conectar");
+        close(sockfd);
+        return;
+    }
+
+    // Enviar el mensaje de saludo (StartupMessage) con protocolo 3.0
+    unsigned char startup_message[] = {
+        0x00, 0x00, 0x00, 0x10,  // Longitud del mensaje (16 bytes)
+        0x00, 0x00, 0x00, 0x03,  // Tipo de mensaje: StartupMessage (0x03)
+        0x00, 0x00, 0x00, 0x00,  // Versión del protocolo (0x00030000 -> 3.0)
+        0x00, 0x00, 0x00, 0x00   // Base de datos vacío (si es necesario, puedes agregarla)
+    };
+
+    // Enviar el paquete de saludo de PostgreSQL (StartupMessage)
+    send(sockfd, startup_message, sizeof(startup_message), 0);
+
+    // Leer la respuesta del servidor PostgreSQL (el banner)
+    int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
+    if (len > 0) {
+        buffer[len] = '\0';  // Asegurarse de que el buffer es una cadena válida
+        printf("Banner PostgreSQL recibido en puerto %d:\n%s\n", port, buffer);
+    } else {
+        printf("No se pudo obtener el banner de PostgreSQL en el puerto %d\n", port);
+    }
+
+    close(sockfd);
+}
+
 void scan_ports(const char *ip, int start_port, int end_port) {
     for (int port = start_port; port <= end_port; ++port) {
         if (scan_port(ip, port)) {
@@ -404,6 +470,10 @@ void scan_ports(const char *ip, int start_port, int end_port) {
                 get_cups_banner(ip, port);  // CUPS
             } else if (port == 389) {
                 get_ldap_banner(ip, port);  // LDAP
+            } else if (port == 3306) {
+                get_mysql_banner(ip, port);  // LDAP
+            } else if (port == 5432) {
+                get_postgresql_banner(ip, port);  // LDAP
             } else if (port == 9050 || port == 9001) {
                 get_tor_banner(ip, port);  // TOR
             } else if (port == 25565) {
