@@ -526,5 +526,7 @@ int main() {
     return 0;
 }
 
+// gcc -o moon moon.c -lssl -lcrypto
+
 
 
