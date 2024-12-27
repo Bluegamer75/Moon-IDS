@@ -512,6 +512,24 @@ void scan_ports(const char *ip, int start_port, int end_port) {
                     get_ssh_banner(ip, port);
                     banner_found = 1;
                 }
+                
+                // Intentar obtener un banner HTTPS (por si es un servidor HTTPS no estándar) 
+                if (!banner_found) {
+                    get_https_banner(ip, port);
+                    banner_found = 1;
+                }
+
+                // Intentar obtener un banner MySQL (por si es un servidor MySQL no estándar)
+                if (!banner_found) {
+                    get_mysql_banner(ip, port);
+                    banner_found = 1;
+                }
+
+                // Intentar obtener un banner PostgreSQL (por si es un servidor PostgreSQL no estándar)
+                if (!banner_found) {
+                    get_postgresql_banner(ip, port);
+                    banner_found = 1;
+                }
 
                 // Intentar obtener un banner FTP (por si es un servidor FTP no estándar)
                 if (!banner_found) {
