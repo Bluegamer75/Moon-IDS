@@ -7,6 +7,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <sys/socket.h>
+#include <getopt.h>
 
 #define TIMEOUT 1  // Tiempo de espera en segundos
 #define BUFSIZE 1024
@@ -190,7 +191,6 @@ void get_ftp_banner(const char *ip, int port) {
     close(sockfd);
 }
 
-// Función para obtener el banner de un servicio SSH
 void get_ssh_banner(const char *ip, int port) {
     int sockfd;
     struct sockaddr_in server_addr;
@@ -216,14 +216,20 @@ void get_ssh_banner(const char *ip, int port) {
         return;
     }
 
-    // Enviar una solicitud de conexión SSH (simple saludo para obtener el banner)
+    // Enviar un saludo SSH simple para obtener el banner
     send(sockfd, "SSH-1.99-OpenSSH_7.2p2 Ubuntu-4ubuntu2.8\r\n", 43, 0);
 
     // Leer la respuesta del servidor
     int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
     if (len > 0) {
-        buffer[len] = '\0';
-        printf("Banner SSH recibido en puerto %d:\n%s\n", port, buffer);
+        buffer[len] = '\0';  // Asegurarse de que el buffer está correctamente terminado
+
+        // Verificar que el banner realmente corresponde a un servicio SSH
+        if (strstr(buffer, "SSH-") != NULL) {
+            printf("Banner SSH recibido en puerto %d:\n%s\n", port, buffer);
+        } else {
+            printf("El banner recibido en puerto %d no es SSH, contenido:\n%s\n", port, buffer);
+        }
     } else {
         printf("No se pudo obtener el banner del puerto %d\n", port);
     }
@@ -457,31 +463,67 @@ void scan_ports(const char *ip, int start_port, int end_port) {
         if (scan_port(ip, port)) {
             printf("Puerto %d abierto en %s\n", port, ip);
 
-            // Llamamos a la función correspondiente según el puerto
-            if (port == 80) {
+            // Variable para controlar si ya se encontró un banner
+            int banner_found = 0;
+
+            // Intentar obtener el banner para puertos conocidos
+            if (port == 80 && !banner_found) {
                 get_http_banner(ip, port);  // HTTP
-            } else if (port == 443) {
+                banner_found = 1;  // Marcamos que ya se encontró un banner
+            } else if (port == 443 && !banner_found) {
                 get_https_banner(ip, port);  // HTTPS
-            } else if (port == 21) {
+                banner_found = 1;
+            } else if (port == 21 && !banner_found) {
                 get_ftp_banner(ip, port);  // FTP
-            } else if (port == 22) {
+                banner_found = 1;
+            } else if (port == 22 && !banner_found) {
                 get_ssh_banner(ip, port);  // SSH
-            } else if (port == 631) {
+                banner_found = 1;
+            } else if (port == 631 && !banner_found) {
                 get_cups_banner(ip, port);  // CUPS
-            } else if (port == 389) {
+                banner_found = 1;
+            } else if (port == 389 && !banner_found) {
                 get_ldap_banner(ip, port);  // LDAP
-            } else if (port == 3306) {
-                get_mysql_banner(ip, port);  // LDAP
-            } else if (port == 5432) {
-                get_postgresql_banner(ip, port);  // LDAP
-            } else if (port == 9050 || port == 9001) {
+                banner_found = 1;
+            } else if (port == 3306 && !banner_found) {
+                get_mysql_banner(ip, port);  // MySQL
+                banner_found = 1;
+            } else if (port == 5432 && !banner_found) {
+                get_postgresql_banner(ip, port);  // PostgreSQL
+                banner_found = 1;
+            } else if ((port == 9050 || port == 9001) && !banner_found) {
                 get_tor_banner(ip, port);  // TOR
-            } else if (port == 25565) {
+                banner_found = 1;
+            } else if (port == 25565 && !banner_found) {
                 get_minecraft_banner(ip, port);  // Minecraft
+                banner_found = 1;
+            } else {
+                // Si no es un puerto conocido, intentamos con banners genéricos
+                printf("Intentando obtener banner genérico en el puerto %d...\n", port);
+
+                // Intentar obtener un banner HTTP (puede ser cualquier servicio web)
+                if (!banner_found) {
+                    get_http_banner(ip, port);
+                    banner_found = 1;  // Marcamos que se ha encontrado un banner
+                }
+
+                // Intentar obtener un banner SSH (por si es un servidor SSH no estándar)
+                if (!banner_found) {
+                    get_ssh_banner(ip, port);
+                    banner_found = 1;
+                }
+
+                // Intentar obtener un banner FTP (por si es un servidor FTP no estándar)
+                if (!banner_found) {
+                    get_ftp_banner(ip, port);
+                    banner_found = 1;
+                }
             }
         }
     }
 }
+
+
 void get_banner(const char *ip, int port) {
     char buffer[BUFSIZE];
     int sockfd;
@@ -516,17 +558,49 @@ void get_banner(const char *ip, int port) {
     close(sockfd);
 }
 
-int main() {
-    const char *target_ip = "127.0.0.1";  // Dirección IP a escanear
-    int start_port = 1;    // Puerto inicial
-    int end_port = 60000;   // Puerto final
-    
+void print_usage(const char *prog_name) {
+    printf("Uso: %s -i <IP> -s <puerto_inicial> -e <puerto_final>\n", prog_name);
+}
+
+int main(int argc, char *argv[]) {
+    const char *target_ip = NULL;
+    int start_port = 0;
+    int end_port = 0;
+    int opt;
+
+    // Parsear los argumentos de la línea de comandos
+    while ((opt = getopt(argc, argv, "i:s:e:")) != -1) {
+        switch (opt) {
+            case 'i':
+                target_ip = optarg;
+                break;
+            case 's':
+                start_port = atoi(optarg);
+                break;
+            case 'e':
+                end_port = atoi(optarg);
+                break;
+            default:
+                print_usage(argv[0]);
+                return EXIT_FAILURE;
+        }
+    }
+
+    // Verificar que todos los argumentos necesarios fueron proporcionados
+    if (target_ip == NULL || start_port <= 0 || end_port <= 0) {
+        print_usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
     scan_ports(target_ip, start_port, end_port);
 
     return 0;
 }
 
-// gcc -o moon moon.c -lssl -lcrypto
+// gcc -o moon moon.c -lssl -lcrypto -lssh
+
+
+
 
 
 
