@@ -603,7 +603,68 @@ int main(int argc, char *argv[]) {
                 return EXIT_FAILURE;
         }
     }
+    // Verificar que todos los argumentos necesarios fueron proporcionados
+    if (target_ip == NULL || start_port <= 0 || end_port <= 0) {
+        print_usage(argv[0]);
+        return EXIT_FAILURE;
+    }
 
+    // Crear un socket para enviar los datos
+    int send_sockfd;
+    struct sockaddr_in send_addr;
+    const char *send_ip = "127.0.0.1";  // IP del receptor
+    int send_port = 12345;  // Puerto del receptor
+
+    send_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (send_sockfd < 0) {
+        perror("Error al crear el socket de envío");
+        return EXIT_FAILURE;
+    }
+
+    memset(&send_addr, 0, sizeof(send_addr));
+    send_addr.sin_family = AF_INET;
+    send_addr.sin_port = htons(send_port);
+    send_addr.sin_addr.s_addr = inet_addr(send_ip);
+
+    if (connect(send_sockfd, (struct sockaddr *)&send_addr, sizeof(send_addr)) < 0) {
+        perror("Error al conectar al receptor");
+        close(send_sockfd);
+        return EXIT_FAILURE;
+    }
+
+    // Redirigir stdout al socket
+    FILE *send_stream = fdopen(send_sockfd, "w");
+    if (send_stream == NULL) {
+        perror("Error al redirigir stdout");
+        close(send_sockfd);
+        return EXIT_FAILURE;
+    }
+
+    // Guardar el stdout original
+    int stdout_fd = dup(STDOUT_FILENO);
+    if (stdout_fd < 0) {
+        perror("Error al duplicar stdout");
+        fclose(send_stream);
+        return EXIT_FAILURE;
+    }
+
+    // Redirigir stdout al socket
+    if (dup2(fileno(send_stream), STDOUT_FILENO) < 0) {
+        perror("Error al redirigir stdout al socket");
+        fclose(send_stream);
+        return EXIT_FAILURE;
+    }
+
+    scan_ports(target_ip, start_port, end_port);
+
+    // Restaurar stdout original
+    fflush(stdout);
+    dup2(stdout_fd, STDOUT_FILENO);
+    close(stdout_fd);
+    fclose(send_stream);
+    close(send_sockfd);
+
+    return 0;
     // Verificar que todos los argumentos necesarios fueron proporcionados
     if (target_ip == NULL || start_port <= 0 || end_port <= 0) {
         print_usage(argv[0]);
