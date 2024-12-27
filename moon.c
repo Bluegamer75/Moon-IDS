@@ -582,12 +582,12 @@ void print_usage(const char *prog_name) {
 
 int main(int argc, char *argv[]) {
     const char *target_ip = NULL;
-    int start_port = 0;
-    int end_port = 0;
+    const char *receiver_ip = NULL;
+    int start_port = 0, end_port = 0, receiver_port = 0;
     int opt;
 
     // Parsear los argumentos de la línea de comandos
-    while ((opt = getopt(argc, argv, "i:s:e:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:s:e:r:p:")) != -1) {
         switch (opt) {
             case 'i':
                 target_ip = optarg;
@@ -598,13 +598,20 @@ int main(int argc, char *argv[]) {
             case 'e':
                 end_port = atoi(optarg);
                 break;
+            case 'r':
+                receiver_ip = optarg;
+                break;
+            case 'p':
+                receiver_port = atoi(optarg);
+                break;
             default:
                 print_usage(argv[0]);
                 return EXIT_FAILURE;
         }
     }
+
     // Verificar que todos los argumentos necesarios fueron proporcionados
-    if (target_ip == NULL || start_port <= 0 || end_port <= 0) {
+    if (target_ip == NULL || start_port <= 0 || end_port <= 0 || receiver_ip == NULL || receiver_port <= 0) {
         print_usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -612,8 +619,6 @@ int main(int argc, char *argv[]) {
     // Crear un socket para enviar los datos
     int send_sockfd;
     struct sockaddr_in send_addr;
-    const char *send_ip = "127.0.0.1";  // IP del receptor
-    int send_port = 12345;  // Puerto del receptor
 
     send_sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (send_sockfd < 0) {
@@ -623,8 +628,8 @@ int main(int argc, char *argv[]) {
 
     memset(&send_addr, 0, sizeof(send_addr));
     send_addr.sin_family = AF_INET;
-    send_addr.sin_port = htons(send_port);
-    send_addr.sin_addr.s_addr = inet_addr(send_ip);
+    send_addr.sin_port = htons(receiver_port);
+    send_addr.sin_addr.s_addr = inet_addr(receiver_ip);
 
     if (connect(send_sockfd, (struct sockaddr *)&send_addr, sizeof(send_addr)) < 0) {
         perror("Error al conectar al receptor");
@@ -665,18 +670,9 @@ int main(int argc, char *argv[]) {
     close(send_sockfd);
 
     return 0;
-    // Verificar que todos los argumentos necesarios fueron proporcionados
-    if (target_ip == NULL || start_port <= 0 || end_port <= 0) {
-        print_usage(argv[0]);
-        return EXIT_FAILURE;
-    }
-
-    scan_ports(target_ip, start_port, end_port);
-
-    return 0;
 }
 
-// gcc -o moon moon.c -lssl -lcrypto -lssh
+// ./moon -i 192.168.1.135 -s 1 -e 10000 -r 127.0.0.1 -p 12345
 
 
 
