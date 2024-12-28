@@ -12,12 +12,10 @@ Objetivos a Futuro:
 
 El sistema tiene como objetivo expandirse en el futuro con las siguientes capacidades adicionales:
 
-    Monitoreo de tráfico en tiempo real: Capturar y analizar el tráfico de red para detectar patrones de comportamiento sospechosos.
+    Monitorizar servicios y hosts en tiempo real (realizando escaneos completos y verificando la integridad)
 
-    Intercepción de comunicaciones: Obtener información más detallada sobre las conexiones de red entre dispositivos y servicios en la infraestructura, permitiendo detectar posibles intrusiones o actividades maliciosas.
+    Seguridad: Realizar escaneos para revisar los cambios del sistemas, sea de archivos o de directorios, leer logs del sistemas criticos y analizarlos
 
-    Monitorización de múltiples dispositivos: Escalar la solución para supervisar y analizar múltiples dispositivos y servicios en una red, facilitando una visibilidad completa de la infraestructura.
+    Analisis de red en tiempo real para detectar posibles ataques DOS o Infiltraciones dentro de las maquinas (log de sudo)
 
-    Análisis y respuesta automática: Implementar mecanismos para identificar automáticamente comportamientos anómalos y generar alertas o respuestas ante eventos de seguridad.
 
-Este enfoque modular y en constante evolución permitirá que el sistema se convierta en una plataforma completa de monitoreo y protección frente a posibles amenazas en redes y servicios.
