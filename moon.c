@@ -75,13 +75,38 @@ void get_http_banner(const char *ip, int port) {
     int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
     if (len > 0) {
         buffer[len] = '\0';
-        printf("Banner HTTP recibido en puerto %d:\n%s\n", port, buffer);
+
+        // Eliminar saltos de línea y retorno de carro
+        char *banner = buffer;
+        for (int i = 0; i < len; i++) {
+            if (buffer[i] == '\n' || buffer[i] == '\r') {
+                buffer[i] = ' ';  // Reemplazar los saltos de línea con un espacio en blanco
+            }
+        }
+
+        // Imprimir la respuesta en una sola línea
+        printf("%s\n", banner);
+
+        // Aquí puedes enviarlo al receptor para que lo procese (a través de otro socket)
+        // En este caso lo enviamos por la misma conexión, pero normalmente sería otro socket
+        // Enviar el banner al receptor o guardarlo en la base de datos
+        // Puedes agregar el código para enviar el banner al servidor receptor aquí
     } else {
         printf("No se pudo obtener el banner del puerto %d\n", port);
     }
 
     close(sockfd);
 }
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+#define BUFSIZE 1024
 
 // Función para obtener el banner de un servicio HTTPS
 void get_https_banner(const char *ip, int port) {
@@ -136,14 +161,28 @@ void get_https_banner(const char *ip, int port) {
         return;
     }
 
-    // Enviar una solicitud HTTPS similar a una solicitud HTTP
+    // Enviar una solicitud HTTPS
     SSL_write(ssl, request, strlen(request));
 
     // Leer la respuesta del servidor
     int len = SSL_read(ssl, buffer, BUFSIZE - 1);
     if (len > 0) {
         buffer[len] = '\0';
-        printf("Banner HTTPS recibido en puerto %d:\n%s\n", port, buffer);
+
+        // Eliminar saltos de línea y retorno de carro
+        for (int i = 0; i < len; i++) {
+            if (buffer[i] == '\n' || buffer[i] == '\r') {
+                buffer[i] = ' ';  // Reemplazar los saltos de línea con un espacio en blanco
+            }
+        }
+
+        // Imprimir la respuesta en una sola línea
+        printf("%s\n", buffer);
+
+        // Aquí puedes enviarlo al receptor para que lo procese (a través de otro socket)
+        // En este caso lo enviamos por la misma conexión, pero normalmente sería otro socket
+        // Enviar el banner al receptor o guardarlo en la base de datos
+        // Puedes agregar el código para enviar el banner al servidor receptor aquí
     } else {
         printf("No se pudo obtener el banner del puerto %d\n", port);
     }
@@ -153,6 +192,7 @@ void get_https_banner(const char *ip, int port) {
     close(sockfd);
     SSL_CTX_free(ctx);
 }
+
 
 void get_ftp_banner(const char *ip, int port) {
     int sockfd;
@@ -250,6 +290,14 @@ void get_ssh_banner(const char *ip, int port) {
     close(sockfd);
 }
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+#define BUFSIZE 1024
+
 // Función para obtener el banner de CUPS
 void get_cups_banner(const char *ip, int port) {
     int sockfd;
@@ -284,13 +332,23 @@ void get_cups_banner(const char *ip, int port) {
     int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
     if (len > 0) {
         buffer[len] = '\0';
-        printf("Banner CUPS recibido en puerto %d:\n%s\n", port, buffer);
+
+        // Eliminar saltos de línea y retorno de carro (convertirlos a espacios)
+        for (int i = 0; i < len; i++) {
+            if (buffer[i] == '\n' || buffer[i] == '\r') {
+                buffer[i] = ' ';  // Reemplazar los saltos de línea con un espacio en blanco
+            }
+        }
+
+        // Imprimir la respuesta del banner en una sola línea
+        printf("Banner CUPS recibido en puerto %d: %s\n", port, buffer);
     } else {
         printf("No se pudo obtener el banner del puerto %d\n", port);
     }
 
     close(sockfd);
 }
+
 
 // Función para obtener el banner de LDAP
 void get_ldap_banner(const char *ip, int port) {
@@ -374,6 +432,7 @@ void get_minecraft_banner(const char *ip, int port) {
     close(sockfd);
 }
 
+
 // Función para obtener el banner de MySQL
 void get_mysql_banner(const char *ip, int port) {
     int sockfd;
@@ -402,9 +461,6 @@ void get_mysql_banner(const char *ip, int port) {
 
     // MySQL responde con un "saludo" que contiene información sobre la versión
     // Enviar el paquete de saludo, siguiendo el protocolo binario de MySQL.
-
-    // Este paquete no es exactamente el handshake real, pero es una forma de establecer
-    // la comunicación inicial.
     char handshake[] = {0x0a, 0x00, 0x00, 0x00}; // Esto es una secuencia de bytes que MySQL espera
     send(sockfd, handshake, sizeof(handshake), 0);
 
@@ -412,13 +468,21 @@ void get_mysql_banner(const char *ip, int port) {
     int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
     if (len > 0) {
         buffer[len] = '\0';  // Asegurarse de que el buffer es una cadena válida
-        printf("Banner MySQL recibido en puerto --puede no llegar nada del buffer %d:\n%s\n", port, buffer);
+
+        // Agregar "yes" al final del banner si se recibe alguna respuesta
+        if (len > 0) {
+            // Convertir el banner recibido a una cadena en formato legible
+            printf("MySQL %d: %s yes\n", port, buffer);
+        } else {
+            printf("No se recibió un banner legible desde MySQL en el puerto %d\n", port);
+        }
     } else {
         printf("No se pudo obtener el banner de MySQL en el puerto %d\n", port);
     }
 
     close(sockfd);
 }
+
 
 // Función para obtener el banner de PostgreSQL
 // Función para obtener el banner de PostgreSQL
@@ -564,7 +628,7 @@ void get_logged_users() {
 
     pclose(fp);
 }
-
+/*
 void get_system_banner() {
     printf("==== Banner del Sistema ====\n");
 
@@ -592,7 +656,7 @@ void get_system_banner() {
     get_logged_users();
     printf("============================\n");
 }
-
+*/
 void scan_ports(const char *ip, int start_port, int end_port) {
     for (int port = start_port; port <= end_port; ++port) {
         if (scan_port(ip, port)) {
@@ -634,7 +698,7 @@ void scan_ports(const char *ip, int start_port, int end_port) {
                 banner_found = 1;
             } else {
                 // Si no es un puerto conocido, intentamos con banners genéricos
-                printf("Intentando obtener banner genérico en el puerto %d...\n", port);
+                
 
                 // Intentar obtener un banner HTTP (puede ser cualquier servicio web)
                 if (!banner_found) {
@@ -796,7 +860,7 @@ int main(int argc, char *argv[]) {
     }
 
     scan_ports(target_ip, start_port, end_port);
-    get_system_banner();
+    //get_system_banner();
 
     // Restaurar stdout original
     fflush(stdout);
