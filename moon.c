@@ -8,6 +8,7 @@
 #include <openssl/err.h>
 #include <sys/socket.h>
 #include <getopt.h>
+#include <sys/statvfs.h>
 
 #define TIMEOUT 1  // Tiempo de espera en segundos
 #define BUFSIZE 1024
@@ -458,6 +459,130 @@ void get_postgresql_banner(const char *ip, int port) {
     close(sockfd);
 }
 
+float get_cpu_usage() {
+    FILE *fp;
+    char buffer[128];
+    long double a[4], b[4], load;
+
+    fp = fopen("/proc/stat", "r");
+    if (fp == NULL) {
+        perror("Error al abrir /proc/stat");
+        return -1.0;
+    }
+
+    fscanf(fp, "cpu %Lf %Lf %Lf %Lf", &a[0], &a[1], &a[2], &a[3]);
+    fclose(fp);
+    sleep(1); // Esperar un segundo para calcular diferencia
+
+    fp = fopen("/proc/stat", "r");
+    if (fp == NULL) {
+        perror("Error al abrir /proc/stat");
+        return -1.0;
+    }
+
+    fscanf(fp, "cpu %Lf %Lf %Lf %Lf", &b[0], &b[1], &b[2], &b[3]);
+    fclose(fp);
+
+    load = ((b[0] + b[1] + b[2]) - (a[0] + a[1] + a[2])) /
+           ((b[0] + b[1] + b[2] + b[3]) - (a[0] + a[1] + a[2] + a[3]));
+    return load * 100.0;
+}
+
+float get_ram_usage() {
+    FILE *fp;
+    char key[32];
+    long total_mem = 0, available_mem = 0;
+
+    fp = fopen("/proc/meminfo", "r");
+    if (fp == NULL) {
+        perror("Error al abrir /proc/meminfo");
+        return -1.0;
+    }
+
+    while (fscanf(fp, "%s %ld", key, &total_mem) != EOF) {
+        if (strcmp(key, "MemTotal:") == 0) {
+            // Leer total_mem
+            fscanf(fp, "%ld", &total_mem);
+        } else if (strcmp(key, "MemAvailable:") == 0) {
+            // Leer available_mem y salir del bucle
+            fscanf(fp, "%ld", &available_mem);
+            break;
+        }
+    }
+    fclose(fp);
+
+    if (total_mem > 0 && available_mem > 0) {
+        float ram_usage = ((float)(total_mem - available_mem) / total_mem) * 100.0;
+        printf("[DEBUG] MemTotal: %ld kB, MemAvailable: %ld kB, Uso de RAM: %.2f%%\n",
+               total_mem, available_mem, ram_usage);
+        return ram_usage;
+    } else {
+        fprintf(stderr, "[ERROR] No se pudo calcular el uso de RAM. MemTotal: %ld, MemAvailable: %ld\n",
+                total_mem, available_mem);
+        return -1.0;
+    }
+}
+
+float get_disk_usage(const char *path) {
+    struct statvfs stat;
+
+    if (statvfs(path, &stat) != 0) {
+        perror("Error al obtener estadísticas del sistema de archivos");
+        return -1.0;
+    }
+
+    long total = stat.f_blocks * stat.f_frsize;
+    long available = stat.f_bfree * stat.f_frsize;
+
+    return ((float)(total - available) / total) * 100.0;
+}
+
+void get_logged_users() {
+    FILE *fp;
+    char buffer[256];
+
+    fp = popen("who", "r");
+    if (fp == NULL) {
+        perror("Error al ejecutar who");
+        return;
+    }
+
+    printf("Usuarios conectados:\n");
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        printf("%s", buffer);
+    }
+
+    pclose(fp);
+}
+
+void get_system_banner() {
+    printf("==== Banner del Sistema ====\n");
+
+    // CPU Usage
+    float cpu_usage = get_cpu_usage();
+    if (cpu_usage >= 0) {
+        printf("Uso del procesador: %.2f%%\n", cpu_usage);
+    }
+
+    // RAM Usage
+    float ram_usage = get_ram_usage();
+    if (ram_usage >= 0) {
+        printf("Uso de RAM: %.2f%%\n", ram_usage);
+    } else {
+        printf("[ERROR] No se pudo calcular el uso de RAM.\n");
+    }
+
+    // Disk Usage
+    float disk_usage = get_disk_usage("/");
+    if (disk_usage >= 0) {
+        printf("Uso de disco: %.2f%%\n", disk_usage);
+    }
+
+    // Logged users
+    get_logged_users();
+    printf("============================\n");
+}
+
 void scan_ports(const char *ip, int start_port, int end_port) {
     for (int port = start_port; port <= end_port; ++port) {
         if (scan_port(ip, port)) {
@@ -577,7 +702,7 @@ void get_banner(const char *ip, int port) {
 }
 
 void print_usage(const char *prog_name) {
-    printf("Uso: %s -i <IP> -s <puerto_inicial> -e <puerto_final>\n", prog_name);
+    printf("Uso: %s -i <IP> -s <puerto_inicial> -e <puerto_final> -r <ip-server> -p <puerto-ip-server>\n", prog_name);
 }
 
 int main(int argc, char *argv[]) {
@@ -661,6 +786,7 @@ int main(int argc, char *argv[]) {
     }
 
     scan_ports(target_ip, start_port, end_port);
+    get_system_banner();
 
     // Restaurar stdout original
     fflush(stdout);
