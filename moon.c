@@ -483,9 +483,6 @@ void get_mysql_banner(const char *ip, int port) {
     close(sockfd);
 }
 
-
-// Función para obtener el banner de PostgreSQL
-// Función para obtener el banner de PostgreSQL
 // Función para obtener el banner de PostgreSQL
 void get_postgresql_banner(const char *ip, int port) {
     int sockfd;
@@ -628,7 +625,7 @@ void get_logged_users() {
 
     pclose(fp);
 }
-/*
+
 void get_system_banner() {
     printf("==== Banner del Sistema ====\n");
 
@@ -656,7 +653,7 @@ void get_system_banner() {
     get_logged_users();
     printf("============================\n");
 }
-*/
+
 void scan_ports(const char *ip, int start_port, int end_port) {
     for (int port = start_port; port <= end_port; ++port) {
         if (scan_port(ip, port)) {
@@ -784,9 +781,10 @@ int main(int argc, char *argv[]) {
     const char *receiver_ip = NULL;
     int start_port = 0, end_port = 0, receiver_port = 0;
     int opt;
+    int send_banners = 0, send_metrics = 0;
 
     // Parsear los argumentos de la línea de comandos
-    while ((opt = getopt(argc, argv, "i:s:e:r:p:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:s:e:r:p:bm")) != -1) {
         switch (opt) {
             case 'i':
                 target_ip = optarg;
@@ -803,6 +801,12 @@ int main(int argc, char *argv[]) {
             case 'p':
                 receiver_port = atoi(optarg);
                 break;
+            case 'b':
+                send_banners = 1;  // Enviar banners
+                break;
+            case 'm':
+                send_metrics = 1;  // Enviar métricas
+                break;
             default:
                 print_usage(argv[0]);
                 return EXIT_FAILURE;
@@ -815,10 +819,15 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    // Asegurarse de que se ha especificado una opción válida (banners o métricas)
+    if (!send_banners && !send_metrics) {
+        print_usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
     // Crear un socket para enviar los datos
     int send_sockfd;
     struct sockaddr_in send_addr;
-
     send_sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (send_sockfd < 0) {
         perror("Error al crear el socket de envío");
@@ -859,8 +868,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    scan_ports(target_ip, start_port, end_port);
-    //get_system_banner();
+    // Enviar los datos según el tipo especificado
+    if (send_banners) {
+        scan_ports(target_ip, start_port, end_port);  // Enviar banners
+    } else if (send_metrics) {
+        get_system_banner();  // Enviar métricas del sistema
+    }
 
     // Restaurar stdout original
     fflush(stdout);
@@ -871,9 +884,6 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
-// ./moon -i 192.168.1.135 -s 1 -e 10000 -r 127.0.0.1 -p 12345
-
 
 
 

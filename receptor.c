@@ -46,6 +46,15 @@ void insert_port_banner(MYSQL *conn, const char *ip_address, int port, const cha
 }
 
 // Función para insertar métricas del sistema
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <mysql/mysql.h>
+
+#define BUFFER_SIZE 1024
+
+
+// Función para insertar las métricas en la base de datos
 void insert_system_metrics(MYSQL *conn, float cpu_usage, float ram_usage, float disk_usage, const char *logged_users) {
     char query[2048];
     snprintf(query, sizeof(query),
@@ -60,29 +69,54 @@ void insert_system_metrics(MYSQL *conn, float cpu_usage, float ram_usage, float 
     }
 }
 
-// Función para procesar y extraer las métricas del sistema
 void process_system_metrics(MYSQL *conn, const char *data) {
-    float cpu_usage = -1.0f;  // Asignar valores predeterminados
+    float cpu_usage = -1.0f;
     float ram_usage = -1.0f;
     float disk_usage = -1.0f;
     char logged_users[BUFFER_SIZE] = "";
 
-    // Aquí procesamos el texto recibido para extraer las métricas
-    if (strstr(data, "Uso del procesador:") != NULL) {
-        sscanf(data, "Uso del procesador: %f%%", &cpu_usage);
-    }
-    if (strstr(data, "Uso de RAM:") != NULL) {
-        sscanf(data, "Uso de RAM: %f%%", &ram_usage);
-    }
-    if (strstr(data, "Uso de disco:") != NULL) {
-        sscanf(data, "Uso de disco: %f%%", &disk_usage);
-    }
-    if (strstr(data, "Usuarios conectados:") != NULL) {
-        sscanf(data, "Usuarios conectados:\n%s", logged_users);
+    // Copiar los datos para procesarlos
+    char *data_copy = strdup(data);
+    if (data_copy == NULL) {
+        fprintf(stderr, "Error al duplicar los datos.\n");
+        return;
     }
 
-    // Insertar las métricas del sistema en la base de datos
-    insert_system_metrics(conn, cpu_usage, ram_usage, disk_usage, logged_users);
+    // Procesamos las métricas y los banners
+    char *line = strtok(data_copy, "\n");
+    while (line != NULL) {
+        // Verificar si la línea contiene información de las métricas
+        if (strstr(line, "Uso del procesador:") != NULL) {
+            sscanf(line, "Uso del procesador: %f%%", &cpu_usage);
+            printf("Uso del procesador: %.2f%%\n", cpu_usage);
+        }
+        if (strstr(line, "Uso de RAM:") != NULL) {
+            sscanf(line, "Uso de RAM: %f%%", &ram_usage);
+            printf("Uso de RAM: %.2f%%\n", ram_usage);
+        }
+        if (strstr(line, "Uso de disco:") != NULL) {
+            sscanf(line, "Uso de disco: %f%%", &disk_usage);
+            printf("Uso de disco: %.2f%%\n", disk_usage);
+        }
+        if (strstr(line, "Usuarios conectados:") != NULL) {
+            // Aquí es donde los usuarios son procesados
+            char *user_line = strtok(NULL, "\n");
+            while (user_line != NULL) {
+                strncat(logged_users, user_line, sizeof(logged_users) - strlen(logged_users) - 1);
+                strncat(logged_users, "\n", sizeof(logged_users) - strlen(logged_users) - 1);
+                user_line = strtok(NULL, "\n");
+            }
+            printf("Usuarios conectados:\n%s", logged_users);
+        }
+        line = strtok(NULL, "\n");
+    }
+
+    // Insertar métricas si son válidas
+    if (cpu_usage != -1.0f || ram_usage != -1.0f || disk_usage != -1.0f) {
+        insert_system_metrics(conn, cpu_usage, ram_usage, disk_usage, logged_users);
+    }
+
+    free(data_copy);
 }
 
 int main(int argc, char *argv[]) {
