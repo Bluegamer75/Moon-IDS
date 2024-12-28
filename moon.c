@@ -154,7 +154,6 @@ void get_https_banner(const char *ip, int port) {
     SSL_CTX_free(ctx);
 }
 
-// Función para obtener el banner de un servicio FTP
 void get_ftp_banner(const char *ip, int port) {
     int sockfd;
     struct sockaddr_in server_addr;
@@ -180,11 +179,24 @@ void get_ftp_banner(const char *ip, int port) {
         return;
     }
 
-    // Leer la respuesta del servidor
+    // Leer la respuesta del servidor (el banner)
     int len = recv(sockfd, buffer, BUFSIZE - 1, 0);
     if (len > 0) {
         buffer[len] = '\0';
-        printf("Banner FTP recibido en puerto %d:\n%s\n", port, buffer);
+
+        // Aquí extraemos solo el banner relevante (ejemplo para FTP)
+        // Asumimos que el banner está en la primera línea
+        char *banner = strtok(buffer, "\n"); // Obtiene la primera línea (el banner)
+        
+        // Solo imprimimos el banner
+        if (banner != NULL) {
+            printf("%s\n", banner);
+            
+            // Aquí puedes enviarlo al receptor para que lo procese (a través de otro socket)
+            // En este caso lo enviamos por la misma conexión, pero normalmente sería otro socket
+            // Enviar el banner al receptor o guardarlo en la base de datos
+            // Puedes agregar el código para enviar el banner al servidor receptor aquí
+        }
     } else {
         printf("No se pudo obtener el banner del puerto %d\n", port);
     }
@@ -490,35 +502,33 @@ float get_cpu_usage() {
 
 float get_ram_usage() {
     FILE *fp;
-    char key[32];
-    long total_mem = 0, available_mem = 0;
+    char buffer[128];
+    int total_mem = 0, used_mem = 0;
 
-    fp = fopen("/proc/meminfo", "r");
+    // Ejecutar el comando free -m y leer su salida
+    fp = popen("free -m", "r");
     if (fp == NULL) {
-        perror("Error al abrir /proc/meminfo");
+        perror("Error al ejecutar el comando free");
         return -1.0;
     }
 
-    while (fscanf(fp, "%s %ld", key, &total_mem) != EOF) {
-        if (strcmp(key, "MemTotal:") == 0) {
-            // Leer total_mem
-            fscanf(fp, "%ld", &total_mem);
-        } else if (strcmp(key, "MemAvailable:") == 0) {
-            // Leer available_mem y salir del bucle
-            fscanf(fp, "%ld", &available_mem);
+    // Leer y analizar la salida
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        if (strstr(buffer, "Mem:") != NULL) {
+            sscanf(buffer, "Mem: %d %d", &total_mem, &used_mem);
             break;
         }
     }
-    fclose(fp);
+    pclose(fp);
 
-    if (total_mem > 0 && available_mem > 0) {
-        float ram_usage = ((float)(total_mem - available_mem) / total_mem) * 100.0;
-        printf("[DEBUG] MemTotal: %ld kB, MemAvailable: %ld kB, Uso de RAM: %.2f%%\n",
-               total_mem, available_mem, ram_usage);
+    if (total_mem > 0) {
+        float ram_usage = ((float)used_mem / total_mem) * 100.0;
+        printf("[DEBUG] Memoria total: %d MB, Memoria usada: %d MB, Uso de RAM: %.2f%%\n",
+               total_mem, used_mem, ram_usage);
         return ram_usage;
     } else {
-        fprintf(stderr, "[ERROR] No se pudo calcular el uso de RAM. MemTotal: %ld, MemAvailable: %ld\n",
-                total_mem, available_mem);
+        fprintf(stderr, "[ERROR] No se pudo calcular el uso de RAM. Memoria total: %d, Memoria usada: %d\n",
+                total_mem, used_mem);
         return -1.0;
     }
 }
