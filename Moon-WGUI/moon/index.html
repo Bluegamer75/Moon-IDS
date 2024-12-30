@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mostrar Banners</title>
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <h1>Información de Banners de Servicios</h1>
+  <table id="banners-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Dirección IP</th>
+        <th>Puerto</th>
+        <th>Banner</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Los banners se cargarán aquí -->
+    </tbody>
+  </table>
+
+  <script>
+    // Función para cargar los banners desde la API
+    async function loadBanners() {
+      try {
+        // Realizar una solicitud a la API
+        const response = await fetch('/api/banners');
+        const data = await response.json();
+
+        // Obtener el cuerpo de la tabla
+        const tableBody = document.querySelector('#banners-table tbody');
+        tableBody.innerHTML = ''; // Limpiar la tabla
+
+        // Insertar cada banner en la tabla
+        data.forEach(banner => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${banner.id}</td>
+            <td>${banner.ip_address}</td>
+            <td>${banner.port}</td>
+            <td>${banner.banner}</td>
+          `;
+          tableBody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Error al cargar los banners:', error);
+      }
+    }
+
+    // Cargar los banners cuando se carga la página
+    window.onload = loadBanners;
+  </script>
+</body>
+</html>
