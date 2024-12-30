@@ -54,6 +54,40 @@ CREATE TABLE port_banners (
     banner TEXT
 );
 ```
+
+# Dependencies
+
+To use the project you must have the following dependencies installed:
+
+`libssl-dev`
+
+`libssh-dev`
+
+`libmysqlclient-dev`
+
+`gcc`
+
+# 
+
+How to install it in the different Linux distributions:
+
+### **Ubuntu/Debian based distros**
+
+```bash
+sudo apt update && sudo apt install libssl-dev libssh-dev libmysqlclient-dev gcc -y
+```
+
+### **Fedora based distros** 
+
+```bash
+sudo dnf update && sudo dnf install openssl-devel libssh-devel mysql-devel gcc
+```
+
+### **Arch linux based distros**
+
+```bash
+sudo pacman -Syu && sudo pacman -S openssl libssh mysql --noconfirm
+```
 # Compilation
 
 We have a `Makefile`, when compiling the project, it takes the files inside the `src/` directory to compile it and take it to `target/release/`
